@@ -67,12 +67,13 @@ while ($true) {
 3. 查询MAC地址
 4. 通过名称模糊查找
 5. 修改保留IP
+6. 通过IP地址查询名称  
 
 输入序号"
-  if ($choice -as [int] -and $choice -ge 1 -and $choice -le 5) {
-    break 
+if ($choice -as [int] -and $choice -ge 1 -and $choice -le 6) {  
+  break 
   } else {
-    Write-Host "错误：请输入有效的序号 (1-5)。"
+    Write-Host "错误：请输入有效的序号 (1-6)。"
   }
 }
 
@@ -179,7 +180,32 @@ switch ($choice) {
       Write-Host "已成功将MAC地址 $macAddress 的IP地址修改为 $newIp"
     }
   }
+  6 {  # 通过IP地址查询名称
+    $ipAddress = Read-Host "请输入IP地址"
+    $found = $false
+    foreach ($scope in Get-DhcpServerv4Scope) {
+      $reservations = Get-DhcpServerv4Reservation -ScopeId $scope.ScopeId
+      $reservation = $reservations | Where-Object { $_.IPAddress -eq $ipAddress }
+      if ($reservation) {
+        # 从筛选器中查找对应 MAC 地址的描述
+        $filter = Get-DhcpServerv4Filter -List Allow | Where-Object { $_.MacAddress -eq $reservation.ClientId }
+        if ($filter) {
+          $name = $filter.Description 
+        } else {
+          $name = "（未找到名称）"  # 如果没有找到对应的筛选器，则显示默认信息
+        }
+        Write-Host "作用域: $($scope.ScopeId)"
+        Write-Host "MAC地址: $($reservation.ClientId)"
+        Write-Host "名称: $name"
+        $found = $true
+        break
+      }
+    }
+    if (-not $found) {
+      Write-Host "错误：未找到IP地址为 $ipAddress 的预留项。"
+    }
+  }  
 }  
-
 [System.Console]::Write("按任意键退出...")
 [void][System.Console]::ReadKey(1)
+
